@@ -1,26 +1,25 @@
 from collections.abc import Callable
-from typing import List, Any
+from typing import List, Any, Union
 
-from pymongo.collection import Collection
+from pymongo.command_cursor import CommandCursor
+from pymongo.cursor import Cursor
+
 
 Emitter = Callable[[str, Any], None]
-MapFunc = Callable[[str, str, Emitter], None]
+MapFunc = Callable[[str, Any, Emitter], None]
 ReduceFunc = Callable[[str, List[str], Emitter], None]
+SortFunc = Callable[[str, str], int]
 
 
 class Config:
-
-    def __init__(self, collection: Collection, output_filename: str, num_mappers: int, num_reducers: int, sort: bool = True):
+    def __init__(self, docs: Union[CommandCursor, Cursor, None], output_filename: str, num_mappers: int, num_reducers: int):
         self.output_filename = output_filename
         self.num_mappers = num_mappers
         self.num_reducers = num_reducers
-        self.sort = sort
-        self.collection = collection
+        self.docs = docs
 
 
 def map_reduce(config: Config, map: MapFunc, reduce: ReduceFunc):
-
-    documents = config.collection.find()
 
     # 1. Map
     map_output = dict()
@@ -29,15 +28,13 @@ def map_reduce(config: Config, map: MapFunc, reduce: ReduceFunc):
             map_output[key] = []
         map_output[key].append(value)
 
-    for document in documents:
-        map(document['_id'], document, map_emit)
+    if config.docs is None:
+        raise ValueError('No documents to process')
 
-    # 2. Sort in desceding order
-    if config.sort:
-        for key in map_output:
-            map_output[key].sort(reverse=True)
+    for doc in config.docs:
+        map(str(doc['_id']), doc, map_emit)
 
-    # 3. Reduce
+    # 2. Reduce
     reduce_output = []
     def reduce_emit(key: str, value: str):
         reduce_output.append((key, value))
@@ -45,14 +42,14 @@ def map_reduce(config: Config, map: MapFunc, reduce: ReduceFunc):
     for key, values in map_output.items():
         reduce(key, values, reduce_emit)
 
-    # 4. Sort reduce output by value
-    if config.sort:
-        reduce_output.sort(key=lambda x: x[1], reverse=True)
+    # 3. Sort reduce output by value
+    reduce_output.sort(key=lambda x: str(x))
 
-    # 5. Output
+    # 4. Write output to file
     with open(config.output_filename, 'w') as f:
         for key, value in reduce_output:
             f.write(f'{key}\t{value}\n')
 
+    # 5. Print output
     for key, value in reduce_output:
         print(f'{key}\t{value}')

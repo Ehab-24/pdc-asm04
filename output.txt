@@ -1,14 +1,5 @@
-12	79
-3	42
-5	42
-14	37
-6	36
-11	29
-13	28
-1	25
-7	22
-10	20
-2	19
-8	7
-4	3
-9	2
+Chicago	{'amount': 30405, 'quantity': 94}
+Houston	{'amount': 14243, 'quantity': 67}
+Los Angeles	{'amount': 33854, 'quantity': 126}
+New York	{'amount': 1597, 'quantity': 8}
+Phoenix	{'amount': 29686, 'quantity': 96}
